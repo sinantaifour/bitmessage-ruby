@@ -23,7 +23,7 @@ module Bitmessage
 
     def receive_data(data)
       puts "Got data from #{node.host}:#{node.port} #{data.inspect}."
-      @data += data
+      @data += data.force_encoding("binary") # Notice the data parameter passed to Message.parse() is expected to be encoded in binary.
       @data, *messages = Message.parse(data)
       messages.each do |message|
         # TODO: process the message.

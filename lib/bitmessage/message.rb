@@ -1,6 +1,8 @@
 module Bitmessage
   class Message
 
+    # The "data" parameter has to be encoded as binary.
+
     MAGIC_VALUE = "\xe9\xbe\xb4\xd9"
     SERVICES_PROVIDED = 1 # Currently hard-coded, as this has no usage in the protocol yet.
     COMMANDS = [:version, :verack, :addr, :inv, :getdata, :msg, :broadcast, :ping, :pong, :alert]
@@ -171,11 +173,11 @@ module Bitmessage
         if i < 0xfd
           [i].pack("C")
         elsif i <= 0xffff
-          "\xfd" + [i].pack("S>")
+          [0xfd, i].pack("CS>")
         elsif i <= 0xffffffff
-          "\xfe" + [i].pack("L>")
+          [0xfe, i].pack("CL>")
         else
-          "\xff" + [i].pack("Q>")
+          [0xff, i].pack("CQ>")
         end
       end
 
@@ -200,6 +202,44 @@ module Bitmessage
 
       def encode_inv_vector(obj)
         sha512(sha512(obj))[0...32]
+      end
+
+      def decode_var_int(data) # Returns [data_post_consumption, int].
+        first_byte = data.unpack("C").first
+        if first_byte < 0xfd
+          consume = 1
+          res = first_byte
+        elsif first_byte == 0xfd
+          consume = 3
+          res = data.unpack("CS>").last # Avoid creating a new string with data[1..-1].
+        elsif first_byte == 0xfe
+          consume = 5
+          res = data.unpack("CL>").last
+        elsif first_byte == 0xff
+          consume = 9
+          res = data.unpack("CQ>").last
+        end
+        [data[consume..-1], res]
+      end
+
+      def decode_var_str(data) # Returns [data_post_consumption, str].
+        data, length = decode_var_int(data)
+        str = data[0...length]
+        [data[length..-1], str]
+      end
+
+      def decode_var_int_list(data) # Returns [data_post_consumption, [int_1, int_2, ...]].
+        res = []
+        data, length = decode_var_int(data)
+        length.times do
+          data, int = decode_var_int(data)
+          res << int
+        end
+        res
+      end
+
+      def decode_net_addr(data) # Returns [data_post_consumption, { ... }].
+        # TODO: write me.
       end
 
       # == Other helpers. ==
