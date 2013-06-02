@@ -11,7 +11,6 @@ module Bitmessage
     # This class assumes all IP addresses use IPv4.
 
     MAGIC_VALUE = "\xe9\xbe\xb4\xd9"
-    COMMANDS = [:version, :verack, :addr, :inv, :getdata, :msg, :broadcast, :ping, :pong, :alert]
     MAX_PARSED_PAYLOAD_SIZE = 180000000 # Ignore messages with payloads bigger than 180MB, as per the original implementation.
 
     class << self
@@ -88,7 +87,7 @@ module Bitmessage
           return [data, nil]
         end
         command = header[4...16].gsub(/(\x00)*$/, "").to_sym
-        unless COMMANDS.include?(command)
+        unless Connection::COMMANDS.include?(command)
           puts "Incorrect command (#{command}). Ignoring."
           return [data, nil]
         end

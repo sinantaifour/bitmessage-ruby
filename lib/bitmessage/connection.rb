@@ -3,7 +3,9 @@ module Bitmessage
 
     attr_reader :node, :connected
 
-    IMPLEMENTED_COMMAND_RECEIVERS = [:version, :verack] # TODO: eventually will be equal to Message::COMMANDS.
+    COMMANDS = [:version, :verack, :addr, :inv, :getdata, :msg, :broadcast, :ping, :pong, :alert]
+    COMMANDS_NOT_REQUIRING_HANDSHAKE = [:version, :verack]
+    COMMANDS_REQUIRING_HANDSHAKE = COMMANDS - COMMANDS_NOT_REQUIRING_HANDSHAKE
 
     def initialize(node, client)
       super
@@ -31,8 +33,10 @@ module Bitmessage
       messages.each do |message|
         command = message.delete(:command)
         puts "Got '#{command}' from #{node.host}:#{node.port}."
-        if IMPLEMENTED_COMMAND_RECEIVERS.include?(command)
-          send(:"received_#{command}_message", message)
+        if COMMANDS_NOT_REQUIRING_HANDSHAKE.include?(command) || (COMMANDS_REQUIRING_HANDSHAKE.include?(command) && handshaked?)
+          send(:"received_#{command}_message", message) if respond_to?(:"received_#{command}_message") # TODO: remove the "if" part when all methods are implemented.
+        else
+          puts "Command not supported, or required handshake not yet established."
         end
       end
     end
@@ -101,12 +105,24 @@ module Bitmessage
       check_for_handshake_completion
     end
 
+    # == Other helpers. ==
+
+    def broadcast_data(message)
+      @client.broadcast_to_handshaked_connections(message)
+    end
+
     # == Others. ==
 
     def check_for_handshake_completion
       if @sent_verack && @received_verack && !@handshaked
         @handshaked = true
         puts "Handshake completed for #{@node.host}:#{@node.port}."
+        set_comm_inactivity_timeout(600) # As per the original implementation. A ping-pong mechanism exists to keep the connection alive.
+        # TODO: Add the node if it is inbound.
+        # TODO: tell all the nodes about this node.
+        # TODO: tell this node about all the nodes.
+        # TODO: close connection if we're above MAX_INBOUND_CONNECTIONS and this is inbound, and test. document: this is done here to share the nodes.
+        # TODO: "sendBigInv"
       end
     end
 

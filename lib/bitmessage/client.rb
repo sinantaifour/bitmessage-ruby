@@ -23,6 +23,12 @@ module Bitmessage
       end
     end
 
+    def broadcast_to_handshaked_connections(data)
+      @conns.select(&:handshaked?).each do |conn|
+        conn.send_data(data)
+      end
+    end
+
     private
 
     attr_accessor :nodes, :conns
