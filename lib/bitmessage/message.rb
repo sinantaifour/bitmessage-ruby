@@ -3,8 +3,14 @@ module Bitmessage
 
     # The "data" parameter has to be encoded as binary.
 
+    # This class is designed not to suffer from currently imposed limitations
+    # in stream selection and services specification. For example, stream
+    # numbers are passed in where appropriate (although the called would use
+    # the currently hard-coded value).
+
+    # This class assumes all IP addresses use IPv4.
+
     MAGIC_VALUE = "\xe9\xbe\xb4\xd9"
-    SERVICES_PROVIDED = 1 # Currently hard-coded, as this has no usage in the protocol yet.
     COMMANDS = [:version, :verack, :addr, :inv, :getdata, :msg, :broadcast, :ping, :pong, :alert]
     MAX_PARSED_PAYLOAD_SIZE = 180000000 # Ignore messages with payloads bigger than 180MB, as per the original implementation.
 
@@ -16,7 +22,7 @@ module Bitmessage
           when :version
             create_version_payload(
               opts[:dest_ip], opts[:dest_port], opts[:dest_services],
-              "0.0.0.0", opts[:src_port], SERVICES_PROVIDED, # The src_ip is ignored by our peers.
+              opts[:src_ip], opts[:src_port], opts[:src_services],
               opts[:nonce]
             )
           when :verack
@@ -67,7 +73,7 @@ module Bitmessage
           data = index ? data[index..-1] : ""
           return [data, nil]
         end
-        payload_length = data[16...20].unpack("L>")
+        payload_length = data[16...20].unpack("L>").first
         return [data, nil] if data.bytesize < payload_length + 24 # Data is not complete yet.
         # == We have the full message, consume it and parse it. ==
         header = data[0...24]
@@ -77,7 +83,7 @@ module Bitmessage
           puts "Message payload bigger than MAX_PARSED_PAYLOAD_SIZE (#{MAX_PARSED_PAYLOAD_SIZE}). Ignoring."
           return [data, nil]
         end
-        if sha512(payload) != header[20...24] # Incorrect checksum, ignore full message.
+        if sha512(payload)[0...4] != header[20...24] # Incorrect checksum, ignore full message.
           puts "Incorrect message checksum. Ignoring."
           return [data, nil]
         end
@@ -86,8 +92,8 @@ module Bitmessage
           puts "Incorrect command (#{command}). Ignoring."
           return [data, nil]
         end
-        puts "Received command #{command} from #{node.host}:#{node.port}."
         message = send(:"parse_#{command}_payload", payload)
+        message[:command] = command if message
         [data, message]
       end
 
@@ -101,12 +107,13 @@ module Bitmessage
         res += encode_net_addr(nil, dest_ip, dest_port, dest_services)
         res += encode_net_addr(nil, src_ip, src_port, src_services)
         res += [nonce].pack("Q>")
-        res += encode_var_str("/bitmessage-ruby #{VERSION}/")
+        res += encode_var_str("/bitmessage-ruby v#{VERSION}/")
         res += encode_var_int_list([STREAM])
         res
       end
 
       def create_verack_payload
+        "" # The payload of a :verack message is an empty string.
       end
 
       def create_addr_payload
@@ -136,34 +143,64 @@ module Bitmessage
       # == Parse payloads of individual message commads. ==
 
       def parse_version_payload(payload)
-        # TODO: continue here.
+        res = {}
+        res[:protocol_version], res[:services], res[:timestamp] = payload.unpack("L>Q>q>")
+        payload = payload[20..-1]
+        payload, dest = decode_net_addr(payload, false)
+        payload, src = decode_net_addr(payload, false)
+        res[:dest_ip], res[:dest_port], res[:dest_services] = dest[:ip], dest[:port], dest[:services]
+        res[:src_ip], res[:src_port], res[:src_services] = src[:ip], src[:port], src[:services]
+        res[:nonce] = payload.unpack("Q>").first
+        payload = payload[8..-1]
+        payload, res[:user_agent] = decode_var_str(payload)
+        payload, res[:streams] = decode_var_int_list(payload)
+        puts "Payload is longer than expected when parsing version message." if payload.length > 0
+        res
       end
 
       def parse_verack_payload(payload)
+        puts "Payload is longer than expected when parsing verack message." if payload.length > 0
+        {} # A :verack message has no payload.
       end
 
       def parse_addr_payload(payload)
+        # puts "Payload is longer than expected when parsing verack message." if payload.length > 0
+        {} # TODO: return an actual message.
       end
 
       def parse_inv_payload(payload)
+        # puts "Payload is longer than expected when parsing verack message." if payload.length > 0
+        {} # TODO: return an actual message.
       end
 
       def parse_getdata_payload(payload)
+        # puts "Payload is longer than expected when parsing verack message." if payload.length > 0
+        {} # TODO: return an actual message.
       end
 
       def parse_msg_payload(payload)
+        # puts "Payload is longer than expected when parsing verack message." if payload.length > 0
+        {} # TODO: return an actual message.
       end
 
       def parse_broadcast_payload(payload)
+        # puts "Payload is longer than expected when parsing verack message." if payload.length > 0
+        {} # TODO: return an actual message.
       end
 
       def parse_ping_payload(payload)
+        # puts "Payload is longer than expected when parsing verack message." if payload.length > 0
+        {} # TODO: return an actual message.
       end
 
       def parse_pong_payload(payload)
+        # puts "Payload is longer than expected when parsing verack message." if payload.length > 0
+        {} # TODO: return an actual message.
       end
 
       def parse_alert_payload(payload)
+        # puts "Payload is longer than expected when parsing verack message." if payload.length > 0
+        {} # TODO: return an actual message.
       end
 
       # === Data type helpers. ===
@@ -196,7 +233,7 @@ module Bitmessage
           res += [stream].pack("L>")
         end
         res += [services].pack("Q>")
-        res += "\x00" * 10 + "\xff" * 2 + ip.split(".").map { |i| [i.to_i].pack("C") }.join("") # Assuming ip contains an IPv4.
+        res += ([0x00] * 10 + [0xff] * 2 + ip.split(".").map { |i| i.to_i }).pack("C16") # Assuming ip contains an IPv4.
         res += [port].pack("S>")
       end
 
@@ -235,11 +272,19 @@ module Bitmessage
           data, int = decode_var_int(data)
           res << int
         end
-        res
+        [data, res]
       end
 
-      def decode_net_addr(data) # Returns [data_post_consumption, { ... }].
-        # TODO: write me.
+      def decode_net_addr(data, with_time_and_stream = true) # Returns [data_post_consumption, { ... }].
+        res = {}
+        if with_time_and_stream
+          res[:time], res[:stream] = data.unpack("Q>L>")
+          data = data[12..-1]
+        end
+        parts = data.unpack("Q>C16S>")
+        res[:services], res[:port] = parts.first, parts.last
+        res[:ip] = parts[13...17].map { |c| c.to_i }.join(".")
+        [data[26..-1], res]
       end
 
       # == Other helpers. ==
