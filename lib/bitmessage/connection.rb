@@ -34,7 +34,7 @@ module Bitmessage
         command = message.delete(:command)
         puts "Got '#{command}' from #{node.host}:#{node.port}."
         if COMMANDS_NOT_REQUIRING_HANDSHAKE.include?(command) || (COMMANDS_REQUIRING_HANDSHAKE.include?(command) && handshaked?)
-          send(:"received_#{command}_message", message) if respond_to?(:"received_#{command}_message") # TODO: remove the "if" part when all methods are implemented.
+          send(:"received_#{command}_message", message)
         else
           puts "Command not supported, or required handshake not yet established."
         end
@@ -103,6 +103,10 @@ module Bitmessage
     def received_verack_message(message)
       @received_verack = true
       check_for_handshake_completion
+    end
+
+    def method_missing(*args) # TODO: temporary, remove once all received_*_message calls are implemented.
+      puts "!!!! GOT A MESSAGE MISSING CALL #{args[0]} !!!!"
     end
 
     # == Other helpers. ==
