@@ -4,7 +4,7 @@ module Bitmessage
     HOUSEKEEPING_INTERVAL = 1
     MAX_OUTBOUND_CONNECTIONS = 8
     MAX_INBOUND_CONNECTIONS = 100
-    MIN_CONNECTION_RERTY_TIME = 60
+    MIN_CONNECTION_RERTY_TIME = 60 # Minimum time between connection retries on the same node.
     LISTEN_ON_PORT = 8444
     SERVICES_PROVIDED = 1 # Currently hard-coded, as this has no usage in the protocol yet.
 
@@ -14,16 +14,16 @@ module Bitmessage
       @nodes = [] # TODO: should be eventually passed in.
       @conns = []
       @nonce = Random.rand(2 ** 64) # Used to stop this client from connecting to itself.
-      bootstrap_nodes
     end
 
     def run!
+      bootstrap_nodes
       EventMachine.run do
         EventMachine::PeriodicTimer.new(HOUSEKEEPING_INTERVAL) { housekeeping! }
       end
     end
 
-    def broadcast_to_handshaked_connections(data)
+    def broadcast_to_handshaked_connections(data) # To be called from inside EventMachine.run().
       @conns.select(&:handshaked?).each do |conn|
         conn.send_data(data)
       end

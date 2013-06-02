@@ -66,9 +66,9 @@ module Bitmessage
     def send_version_message
       message = Message.create(
         :version,
-        :dest_ip => @node.host, :dest_port => @node.port, :dest_services => @node.services,
-        :src_ip => "0.0.0.0", :src_port => Client::LISTEN_ON_PORT, :src_services => Client::SERVICES_PROVIDED, # The :src_ip will be ignored by our peer.
-        :nonce => @client.nonce
+        @node.host, @node.port, @node.services,
+        "0.0.0.0", Client::LISTEN_ON_PORT, Client::SERVICES_PROVIDED, # The :src_ip will be ignored by our peer.
+        @client.nonce
       )
       send_data message
     end
@@ -123,7 +123,7 @@ module Bitmessage
         puts "Handshake completed for #{@node.host}:#{@node.port}."
         set_comm_inactivity_timeout(600) # As per the original implementation. A ping-pong mechanism exists to keep the connection alive.
         # TODO: Add the node if it is inbound.
-        # TODO: tell all the nodes about this node.
+        # TODO: tell all the nodes about this node. # TODO: continue here.
         # TODO: tell this node about all the nodes.
         # TODO: close connection if we're above MAX_INBOUND_CONNECTIONS and this is inbound, and test. document: this is done here to share the nodes.
         # TODO: "sendBigInv"

@@ -15,35 +15,8 @@ module Bitmessage
 
     class << self
 
-      def create(command, opts = {})
-        # == Generate the payload depending on the message command. ==
-        payload = case command
-          when :version
-            create_version_payload(
-              opts[:dest_ip], opts[:dest_port], opts[:dest_services],
-              opts[:src_ip], opts[:src_port], opts[:src_services],
-              opts[:nonce]
-            )
-          when :verack
-            create_verack_payload
-          when :addr
-            create_addr_payload
-          when :inv
-            create_inv_payload
-          when :getdata
-            create_getdata_payload
-          when :msg
-            create_msg_payload
-          when :broadcast
-            create_broadcast_payload
-          when :ping
-            create_ping_payload
-          when :pong
-            create_pong_payload
-          when :alert
-            create_alert_payload
-        end
-        # == Add the header. ==
+      def create(command, *args)
+        payload = send(:"create_#{command}_payload", *args)
         header = MAGIC_VALUE
         header += (command.to_s +  "\x00" * 12)[0...12]
         header += [payload.bytesize].pack("L>")
