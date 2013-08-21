@@ -1,0 +1,16 @@
+PATH
+  remote: .
+  specs:
+    bitmessage (0.1.0)
+      eventmachine
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    eventmachine (1.0.3)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  bitmessage!
