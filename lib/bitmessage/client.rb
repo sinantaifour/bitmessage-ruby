@@ -13,7 +13,7 @@ module Bitmessage
     def initialize
       @nodes = [] # TODO: should be eventually passed in.
       @conns = []
-      @nonce = Random.rand(2 ** 64) # Used to stop this client from connecting to itself.
+      @nonce = rand(2 ** 64) # Used to stop this client from connecting to itself.
     end
 
     def run!

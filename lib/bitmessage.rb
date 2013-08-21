@@ -4,11 +4,11 @@ require 'eventmachine'
 require 'openssl'
 
 # == Internal gem files. ==  # TODO: turn into 
-load 'bitmessage/client.rb'
-load 'bitmessage/connection.rb'
-load 'bitmessage/message.rb'
-load 'bitmessage/node.rb'
-load 'bitmessage/version.rb'
+require 'bitmessage/version.rb'
+require 'bitmessage/client.rb'
+require 'bitmessage/connection.rb'
+require 'bitmessage/message.rb'
+require 'bitmessage/node.rb'
 
 module Bitmessage
 
